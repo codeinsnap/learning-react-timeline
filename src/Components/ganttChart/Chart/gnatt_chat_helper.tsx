@@ -95,14 +95,14 @@ const isValidSlot = (slot: TPlannedData) => {
 export const handleTimeModifications = (data: TPlannedData, currentTime: string) => {
 
   if (data.actual_start_time && data.actual_start_time > currentTime) {
-    return {isValid: false, obj: {}}
+    return { isValid: false, obj: {} }
   }
 
   if (data.actual_end_time && data.actual_end_time > currentTime) {
-    return {isValid: true, obj: { ...data, actual_end_time: currentTime}}
+    return { isValid: true, obj: { ...data, actual_end_time: currentTime } }
   }
 
-  return {isValid: true, obj: data}
+  return { isValid: true, obj: data }
 };
 
 
@@ -145,7 +145,12 @@ export const entiresBeforeShiftTimings = (stall: TstallProdLine[], shiftTimings:
       "planned_end_time": entry?.prod_line ? end : "",
       "actual_start_time": entry?.prod_line ? '' : start,
       "actual_end_time": entry?.prod_line ? '' : end,
-      std_install_time: ''
+      std_install_time: '',
+      style: entry?.prod_line ? null : {
+        background: "yellow",
+        borderColor: "black",
+        color: "yellow",
+      }
     }, currentTime)
 
     const afterShift = handleTimeModifications({

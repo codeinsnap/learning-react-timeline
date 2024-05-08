@@ -61,6 +61,7 @@ export type Tgroup = {
       end: string;
     };
     isAfterBreak?: boolean;
+    style?: any
   };
   
   export type TTimeLineItem = {
