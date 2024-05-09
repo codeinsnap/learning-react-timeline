@@ -1,5 +1,4 @@
 import React, { useState, useCallback } from "react";
-import VPTBFilters from "./VPTBFilters";
 import GnattChart from "./Chart";
 import { TBreak, TRawPlannedData, Tgroup } from './Chart/gnatt_chart_types'
 import { handleUniqueStallsAndProdLines } from "./Chart/gnatt_chat_helper"

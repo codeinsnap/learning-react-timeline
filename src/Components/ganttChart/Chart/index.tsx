@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import Timeline, {
   TimelineMarkers,
   CustomMarker,
@@ -15,9 +15,10 @@ import {
   splitTimeSlotsByBreaks,
   entiresBeforeShiftTimings,
 } from "./gnatt_chat_helper";
-import { TBreak, TPlannedData, TRawPlannedData, Tgroup, TstallProdLine } from "./gnatt_chart_types";
+import { TBreak, TPlannedData, TRawPlannedData, Tgroup } from "./gnatt_chart_types";
 import DATA from '../../../Constants/constant.json'
 import moment from "moment-timezone";
+import './styleFile.css'
 
 const currentDate = new Date();
 const currentDateString = currentDate.toISOString().slice(0, 10);
@@ -36,8 +37,9 @@ type TGnattChartProps = {
 
 export default function GnattChart({ groups, breaks, plannedData, isFilteredApplied, timeFilters, vinTimeDuration }: TGnattChartProps) {
 
-  const { ShiftDetails, shopDetail, CompletedData } = DATA.data;
-
+  const { ShiftDetails, shopDetail } = DATA.data;
+  const [vehicleGroup, setVehicleGroups] = useState<any[]>([])
+  const timelineRef = useRef(null)
 
   const localOffset = moment().utcOffset();
   const timezoneOffset = moment().tz('America/Los_Angeles').utcOffset();
@@ -46,6 +48,15 @@ export default function GnattChart({ groups, breaks, plannedData, isFilteredAppl
   const updated = moment(newCurrentTime, 'YYYY-MM-DD HH:mm:ss')
 
   const groupsWithExtraRow = useMemo(() => { return handleNewGroups(groups ?? []) ?? [] }, [groups]);
+
+  useEffect(() => {
+
+    if (groupsWithExtraRow.length > 0) {
+      setVehicleGroups(groupsWithExtraRow.slice(0, 10) as any)
+    }
+
+  }, [groupsWithExtraRow, vehicleGroup.length])
+
   const listExcludingShiftTime = useMemo(() => { return entiresBeforeShiftTimings(groupsWithExtraRow ?? [], ShiftDetails?.shiftTime, moment(today).format('HH:mm:ss')) }, [ShiftDetails?.shiftTime, groupsWithExtraRow, today])
   const breakTimes = useMemo(() => { return breaks?.map((breakItem: TBreak) => ({ start: new Date(`${currentDateString}T${breakItem?.breakStart}`), end: new Date(`${currentDateString}T${breakItem?.breakEnd}`) })) }, [breaks])
   const entriesIncludingBreakandShfitTime = useMemo(() => { return splitTimeSlotsByBreaks(breaks ?? [], plannedData ?? []) }, [breaks, plannedData])
@@ -77,8 +88,8 @@ export default function GnattChart({ groups, breaks, plannedData, isFilteredAppl
       (element: { id: string; description: string }) => element.id == value
     );
     const displayValue = `${label?.description?.length ?? 0 > 12
-        ? (label?.description ?? '')?.substring(0, 12)
-        : label?.description
+      ? (label?.description ?? '')?.substring(0, 12)
+      : label?.description
       } (${value})`;
     return displayValue;
   };
@@ -243,13 +254,42 @@ export default function GnattChart({ groups, breaks, plannedData, isFilteredAppl
   const endTime = visibleDuration.end;
   const key = `${startTime}-${endTime}`
 
+
+  const [startIndex, setStartIndex] = useState(0);
+  const [endIndex, setEndIndex] = useState(10); // Assuming 5 elements per page
+
+  const handleScroll = (event: any) => {
+    const timelineWrapper = event.target;
+    const bottom = timelineWrapper.scrollHeight - timelineWrapper.scrollTop === timelineWrapper.clientHeight;
+    const top = timelineWrapper.scrollTop === 0;
+    timelineWrapper.scrollTop = 30
+    if (groupsWithExtraRow.length > 5) {
+      if (bottom && endIndex < groupsWithExtraRow.length - 1) {
+        setVehicleGroups(groupsWithExtraRow.slice(startIndex + 6, endIndex + 6))
+        setStartIndex(startIndex + 6);
+        setEndIndex(endIndex + 6);
+      } else if (top && startIndex > 0) {
+        setVehicleGroups(groupsWithExtraRow.slice(startIndex - 6, endIndex - 6))
+        setStartIndex(startIndex - 6);
+        setEndIndex(endIndex - 6);
+      }
+    }
+
+  };
+
+
+
+
+
   return (
     <div className={gnatt_chart_1_tailwind.gnattChartWrapper + ' vptb_gantt_chart'}
       key={key}
       style={{ border: '1px solid black' }}
+      onScroll={handleScroll}
+      ref={timelineRef}
     >
       <Timeline
-        groups={groupsWithExtraRow ?? []}
+        groups={vehicleGroup ?? []}
         groupRenderer={renderGroup}
         items={timeLineItems}
         itemRenderer={handleItemRenderer}
