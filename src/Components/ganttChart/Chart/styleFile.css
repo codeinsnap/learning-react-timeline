@@ -1,0 +1,15 @@
+.rct-header-root {
+    position: absolute;
+    z-index: 1000;
+    max-width: calc(100% - 179px);
+}
+
+.rct-scroll {
+    margin-top: 30px;
+    margin-bottom: 30px
+}
+
+.rct-sidebar {
+    margin-top: 30px;
+    margin-bottom: 30px;
+}

@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import Timeline, {
   TimelineMarkers,
   CustomMarker,
@@ -14,10 +14,13 @@ import {
   handleNewGroups,
   splitTimeSlotsByBreaks,
   entiresBeforeShiftTimings,
+  setColorAndTooltip,
+  handleCompleteData,
 } from "./gnatt_chat_helper";
-import { TBreak, TPlannedData, TRawPlannedData, Tgroup, TstallProdLine } from "./gnatt_chart_types";
+import { TBreak, TPlannedData, TRawPlannedData, Tgroup } from "./gnatt_chart_types";
 import DATA from '../../../Constants/constant.json'
 import moment from "moment-timezone";
+import './styleFile.css'
 
 const currentDate = new Date();
 const currentDateString = currentDate.toISOString().slice(0, 10);
@@ -37,8 +40,10 @@ type TGnattChartProps = {
 export default function GnattChart({ groups, breaks, plannedData, isFilteredApplied, timeFilters, vinTimeDuration }: TGnattChartProps) {
 
   const { ShiftDetails, shopDetail, CompletedData } = DATA.data;
-
-
+  const [vehilceGroupData, setVehilceGroupData] = useState<any[]>([])
+  const [startIndex, setStartIndex] = useState(0);
+  const [endIndex, setEndIndex] = useState(14); // Assuming 5 elements per page
+  const timelineRef = useRef(null)
   const localOffset = moment().utcOffset();
   const timezoneOffset = moment().tz('America/Los_Angeles').utcOffset();
   const today = moment().add(timezoneOffset - localOffset, 'm').valueOf();
@@ -46,8 +51,23 @@ export default function GnattChart({ groups, breaks, plannedData, isFilteredAppl
   const updated = moment(newCurrentTime, 'YYYY-MM-DD HH:mm:ss')
 
   const groupsWithExtraRow = useMemo(() => { return handleNewGroups(groups ?? []) ?? [] }, [groups]);
+
+  useEffect(() => {
+
+    if (groupsWithExtraRow.length > 0) {
+      setVehilceGroupData(groupsWithExtraRow.slice(0, 14) as any)
+    }
+
+  }, [groupsWithExtraRow])
+
   const listExcludingShiftTime = useMemo(() => { return entiresBeforeShiftTimings(groupsWithExtraRow ?? [], ShiftDetails?.shiftTime, moment(today).format('HH:mm:ss')) }, [ShiftDetails?.shiftTime, groupsWithExtraRow, today])
   const breakTimes = useMemo(() => { return breaks?.map((breakItem: TBreak) => ({ start: new Date(`${currentDateString}T${breakItem?.breakStart}`), end: new Date(`${currentDateString}T${breakItem?.breakEnd}`) })) }, [breaks])
+  
+  
+  const updatedCompleteData = splitTimeSlotsByBreaks(breaks, CompletedData, moment(today).format('HH:mm:ss'))
+  console.log("🚀 ~ GnattChart ~ updatedCompleteData:", updatedCompleteData)
+
+
   const entriesIncludingBreakandShfitTime = useMemo(() => { return splitTimeSlotsByBreaks(breaks ?? [], plannedData ?? []) }, [breaks, plannedData])
 
   const handleTimelineData = useMemo(() => {
@@ -66,7 +86,7 @@ export default function GnattChart({ groups, breaks, plannedData, isFilteredAppl
     }
   }, [groupsWithExtraRow])
 
-  const timeLineItems = [...entriesIncludingBreakandShfitTime, ...listExcludingShiftTime]?.map((item: TPlannedData, index: number) => {
+  const timeLineItems = [...entriesIncludingBreakandShfitTime, ...listExcludingShiftTime, ...updatedCompleteData]?.map((item: TPlannedData, index: number) => {
     const start = new Date(`${currentDateString}T${item?.actual_start_time || item.planned_start_time}`);
     const end = new Date(`${currentDateString}T${item?.actual_end_time || item?.planned_end_time}`);
     return handleTimelineData(start, end, item, index)
@@ -77,8 +97,8 @@ export default function GnattChart({ groups, breaks, plannedData, isFilteredAppl
       (element: { id: string; description: string }) => element.id == value
     );
     const displayValue = `${label?.description?.length ?? 0 > 12
-        ? (label?.description ?? '')?.substring(0, 12)
-        : label?.description
+      ? (label?.description ?? '')?.substring(0, 12)
+      : label?.description
       } (${value})`;
     return displayValue;
   };
@@ -105,12 +125,12 @@ export default function GnattChart({ groups, breaks, plannedData, isFilteredAppl
       <div>
         <div>VIN: {item?.itemData?.vin ?? ''}</div>
         <div>Planned Start Time: {item?.prevtime?.start ?? item?.itemData?.planned_start_time ?? ''}</div>
-        <div>Planned End Time: {item?.prevtime.end ?? item?.itemData?.planned_end_time ?? ''}</div>
+        <div>Planned End Time: {item?.prevtime?.end ?? item?.itemData?.planned_end_time ?? ''}</div>
         <div>Std Install Time: {item?.itemData?.std_install_time ?? ''}</div>
         <div>Model Year: {item?.itemData?.model_year ?? ''}</div>
         <div>Model Type: {item?.itemData?.model_type ?? ''}</div>
-        {item.itemData?.actual_start_time && <div>Actual Start Time: {item.itemData?.actual_start_time ?? ''}</div>}
-        {item.itemData?.actual_end_time && <div>Actual End Time: {item.itemData?.actual_end_time ?? ''}</div>}
+        {item.itemData?.actual_start_time && <div>Actual Start Time: {item?.prevtime?.actual_start ?? item.itemData?.actual_start_time ?? ''}</div>}
+        {item.itemData?.actual_end_time && <div>Actual End Time: {item?.prevtime?.actual_end ?? item.itemData?.actual_end_time ?? ''}</div>}
       </div>
     );
   };
@@ -120,8 +140,7 @@ export default function GnattChart({ groups, breaks, plannedData, isFilteredAppl
     if (!item || !getItemProps) return <></>
 
     const newItemProps = { ...getItemProps(item) };
-    const { end_time, start_time } = item as any;
-
+    const { end_time, start_time, itemData } = item as any;
     const handleMouseEnter = (e: any) => {
       const el = e.target;
       if (el) {
@@ -129,6 +148,7 @@ export default function GnattChart({ groups, breaks, plannedData, isFilteredAppl
       }
     }
 
+    
 
     let color = "white";
     let showTooltip = true
@@ -195,11 +215,10 @@ export default function GnattChart({ groups, breaks, plannedData, isFilteredAppl
       }
     }
 
-
     return (
       <>
         <div {...newItemProps} onMouseEnter={handleMouseEnter} >
-          <div id={`tooltip-${item.id}`} data-tooltip-position-strategy={'fixed'}>{item.title ?? ''}</div>
+          <div id={`tooltip-${item.id}`} data-tooltip-position-strategy={'fixed'}>{item.title ?? 'testest'}</div>
         </div>
         <div>
           {showTooltip && (<Tooltip
@@ -243,13 +262,40 @@ export default function GnattChart({ groups, breaks, plannedData, isFilteredAppl
   const endTime = visibleDuration.end;
   const key = `${startTime}-${endTime}`
 
+  const handleScroll = (event: any) => {
+    const timelineWrapper = event.target;
+    const bottom = timelineWrapper.scrollHeight + 1 - Math.ceil(timelineWrapper.scrollTop) === timelineWrapper.clientHeight;
+    const top = timelineWrapper.scrollTop === 0;
+    const lastGrp = (groupsWithExtraRow.length - 1) - endIndex
+
+    if (groupsWithExtraRow.length > 0) {
+      if (bottom && endIndex < groupsWithExtraRow.length - 1 && lastGrp > 6) {
+        setVehilceGroupData(groupsWithExtraRow.slice(startIndex + 8, endIndex + 8))
+        setStartIndex(startIndex + 8);
+        setEndIndex(endIndex + 8);
+      } else if (top && startIndex > 0) {
+        setVehilceGroupData(groupsWithExtraRow.slice(startIndex - 8, endIndex - 8))
+        setStartIndex(startIndex - 8);
+        setEndIndex(endIndex - 8);
+      }
+    }
+  }
+
+  useEffect(() => {
+    if (startIndex > 0 && endIndex > 14) {
+      timelineRef?.current && (timelineRef?.current as any)?.scrollTo({ top: 25, behavior: 'smooth' })
+    }
+  }, [endIndex, startIndex, vehilceGroupData])
+
   return (
     <div className={gnatt_chart_1_tailwind.gnattChartWrapper + ' vptb_gantt_chart'}
       key={key}
       style={{ border: '1px solid black' }}
+      onScroll={handleScroll}
+      ref={timelineRef}
     >
       <Timeline
-        groups={groupsWithExtraRow ?? []}
+        groups={vehilceGroupData ?? []}
         groupRenderer={renderGroup}
         items={timeLineItems}
         itemRenderer={handleItemRenderer}
